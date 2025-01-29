@@ -1,0 +1,72 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Device is already configured.",
+      "already_in_progress": "Configuration flow is already in progress",
+      "authorize_url_timeout": "Timeout generating authorize URL.",
+      "missing_configuration": "The component is not configured. Please follow the documentation.",
+      "no_url_available": "No URL available. For information about this error, [check the help section]({docs_url})",
+      "oauth_error": "Received invalid token data.",
+      "oauth_failed": "Error while obtaining access token.",
+      "oauth_timeout": "Timeout resolving OAuth token.",
+      "oauth_unauthorized": "OAuth authorization error while obtaining access token.",
+      "user_rejected_authorize": "Account linking rejected: {error}"
+    },
+    "create_entry": {
+      "default": "Successfully authenticated"
+    },
+    "step": {
+      "pick_implementation": {
+        "title": "Pick authentication method"
+      },
+      "user": {
+        "title": "Enter your MySol-Ark Cloud email and password",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "username": "Enter your email address for the Sol-Ark data cloud.",
+          "password": "Enter your password for the Sol-Ark data cloud."
+        }
+      },
+      "solcast_api": {
+        "title": "Enter your Solcast API key and resource ID",
+        "description": "(These are found under your account settings at solcast.com)",
+        "data": {
+          "api_key": "API Key",
+          "resource_id": "Resource ID"
+        },
+        "data_description": {
+          "api_key": "Enter the API key for your Solcast account (found under your account settings).",
+          "resource_id": "Enter the resource ID for your Solcast account."
+        }
+      },
+      "parameters": {
+        "title": "Grid Boost options",
+        "description": "(These are found under your account settings at solcast.com)",
+        "data": {
+          "boost": "Automated or manual boost?",
+          "manual_boost_soc": "Boost State of Charge (SoC) when in manual mode?",
+          "history_days": "How many days of load history for automated calculations?",
+          "forecast_hour": "When you want to request the new PV forecast?",
+          "min_battery_soc": "What percentage of battery charge do you desire at the end of the day?",
+          "percentile": "Select worst-case (10) or best-case (90) forecasts."
+        },
+        "data_description": {
+          "boost": "Automaticly calculate grid boost, or manually set (eg snowly days).",
+          "manual_boost_soc": "When in manual mode, the target SoC for off-peak charging.",
+          "history_days": "Fewer days of load history allow for faster seasonal changes. 4 is suggested.",
+          "forecast_hour": "When (in 24 hour time) should solcast.com be called for new forecast data. Suggest 11pm (23).",
+          "min_battery_soc": "Automatic calculations will set off-peak charging levels to keep the battery at or above this level at the end of the day.",
+          "percentile": "Worst-case forecasts will result in more off-peak charging. Best-case may result in more charging at other times."
+        }
+      }
+    },
+    "error": {
+      "invalid_solark_auth": "Invalid authentication, please check your username and password.",
+      "invalid_solcast_auth": "Solcast API login failed.",
+      "invalid_update_hour": "Forecast hour must be an integer between 0 and 23."
+    }
+  }
+}
