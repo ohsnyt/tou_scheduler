@@ -126,7 +126,6 @@ def sum_data(input_str: str) -> int:
     """
     # Remove the curly braces
     input_str = input_str.strip("{}")
-    logger.debug("sum_data: input_str: %s", input_str)
     # Check for empty data
     if input_str == "":
         return 0

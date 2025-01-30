@@ -1,24 +1,57 @@
-import { calculateArcPath } from "./utils.js";
-import {
-  startChangingManualBoostValue,
-  stopChangingValue,
-} from "./eventHandlers.js";
-import { getTemplate } from "./template.js";
-import { ACTIVE_FONT_SIZE, NON_ACTIVE_FONT_SIZE } from "./constants.js";
-
 class TouSchedulerCard extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: "open" });
+    this.attachShadow({ mode: 'open' });
+    this._initialized = false;
+    this._hass = null;
+    this._config = null;
+    this._entityState = null;
+    this._entityAttributes = {};
+    this._rejected_count = 0;
+  }
+
+  connectedCallback() {
+    if (!this._initialized) {
+      this.render();
+      this._initialized = true;
+    }
   }
 
   set hass(hass) {
-    this._hass = hass;
-    this.render();
+    if (this._hass !== hass) {
+      this._hass = hass;
+      this._updateCard();
+    }
   }
 
   setConfig(config) {
     this._config = config;
+  }
+
+  _updateCard() {
+    if (!this._config || !this._hass) {
+      this._rejected_count +=1
+      return;
+    }
+    console.log("Rejected " + this._rejected_count, " calls to _updateCard. Now updating.");
+    this._rejected_count = 0;
+
+    const stateObj = this._hass.states[this._config.entity];
+
+    if (!stateObj) {
+      this.shadowRoot.innerHTML = `<hui-warning>Entity not found: ${this._config.entity}</hui-warning>`;
+      return;
+    }
+
+    // Check if the state or attributes have changed
+    if (
+      this._entityState !== stateObj.state ||
+      JSON.stringify(this._entityAttributes) !== JSON.stringify(stateObj.attributes)
+    ) {
+      this._entityState = stateObj.state;
+      this._entityAttributes = { ...stateObj.attributes };
+      this.render();
+    }
   }
 
   render() {
@@ -36,7 +69,6 @@ class TouSchedulerCard extends HTMLElement {
 
     // Initialize key values
     this._boostMode = stateObj.state || "off";
-    // console.log("TouSchedulerCard.render() this._boostMode: ", this._boostMode);
     this._manual = parseInt(stateObj.attributes.manual) || 0;
     this._calculated = parseInt(stateObj.attributes.calculated) || 0;
     this._confidence = parseInt(stateObj.attributes.confidence) || 0;
@@ -56,64 +88,10 @@ class TouSchedulerCard extends HTMLElement {
 
     // Update the card's content based on the new state and attributes
     this._updateSettingsButtons();
-    this._updateMode();
     this._updateHTML();
 
     // Attach event listeners
     this._attachEventListeners();
-  }
-
-  static getStubConfig(hass, entities, entitiesFallback) {
-    const includeDomains = ["sensor"];
-    const maxEntities = 1;
-    const foundEntities = TouSchedulerCard.findEntities(
-      hass,
-      maxEntities,
-      entities,
-      entitiesFallback,
-      includeDomains,
-    );
-
-    return { type: "tou-scheduler", entity: foundEntities[0] || "" };
-  }
-
-  get hass() {
-    return this._hass;
-  }
-
-  setConfig(config) {
-    if (!config.entity || config.entity.split(".")[0] !== "sensor") {
-      throw new Error("Specify an entity from within the sensor domain");
-    }
-    this._config = config;
-    this.render();
-  }
-
-  get config() {
-    return this._config;
-  }
-
-  getCardSize() {
-    return 3;
-  }
-
-  _updateManualBoostValues(change) {
-    this._manual = Math.max(
-      this._config.min || 0,
-      Math.min(this._config.max || 100, this._manual + change),
-    );
-    this._updateHTML();
-    clearTimeout(this._timeout);
-    this._timeout = setTimeout(() => {
-      this._hass.callService("tou_scheduler", "set_boost_settings", {
-        boost_mode: this._boostMode,
-        confidence: this._confidence,
-        load_days: this._loadDays,
-        manual_grid_boost: this._manual,
-        min_battery_soc: this._minSoc,
-        update_hour: this.update_hour,
-      });
-    }, 2000);
   }
 
   _toggleSettingsPopup() {
@@ -207,50 +185,6 @@ class TouSchedulerCard extends HTMLElement {
       confidenceText.addEventListener("click", () =>
         this._toggleSliderPopup("confidence-popup"),
       );
-    }
-    const loadText = this.shadowRoot.getElementById("loadText");
-    if (loadText) {
-      loadText.addEventListener("click", () =>
-        this._toggleSliderPopup("load-popup"),
-      );
-    }
-    const timeText = this.shadowRoot.getElementById("timeText");
-    if (timeText) {
-      timeText.addEventListener("click", () =>
-        this._toggleSliderPopup("time-popup"),
-      );
-    }
-
-    // Attach event listeners to close buttons
-    const closeButtons = this.shadowRoot.querySelectorAll(".close-btn");
-    closeButtons.forEach((button) => {
-      button.addEventListener("click", (event) => {
-        const popup = button.closest(".slider-popup");
-        if (popup) {
-          popup.style.display = "none";
-        }
-        // this._updateSliderValue(event.target.dataset.update);
-        this._updateSettingsButtons();
-      });
-    });
-
-    // Attach event listeners to sliders
-    const minSocSlider = this.shadowRoot.getElementById("min-soc-slider");
-    if (minSocSlider) {
-      minSocSlider.addEventListener("input", () => {
-        this.shadowRoot.getElementById("min-soc-value").textContent =
-          minSocSlider.value;
-        this._minSoc = parseInt(minSocSlider.value);
-      });
-    }
-    const confidenceSlider =
-      this.shadowRoot.getElementById("confidence-slider");
-    if (confidenceSlider) {
-      confidenceSlider.addEventListener("input", () => {
-        this.shadowRoot.getElementById("confidence-value").textContent =
-          confidenceSlider.value;
-        this._confidence = parseInt(confidenceSlider.value);
-      });
     }
     const loadSlider = this.shadowRoot.getElementById("load-slider");
     if (loadSlider) {
@@ -358,16 +292,14 @@ class TouSchedulerCard extends HTMLElement {
     }
     // Now display that same manual number in the center of the gauge
     const manNumber = this.shadowRoot.getElementById("manual-number");
-    const buttons = this.shadowRoot.querySelectorAll(".button");
     if (manNumber) {
       manNumber.textContent = this._manual;
-      if (this._boostMode === "Automatic" || this._boostMode === "Off") {
-        manNumber.setAttribute("font-size", NON_ACTIVE_FONT_SIZE);
-        buttons.forEach((button) => (button.style.display = "none"));
-      } else {
-        manNumber.setAttribute("font-size", ACTIVE_FONT_SIZE);
-        buttons.forEach((button) => (button.style.display = "inline-block"));
-      }
+      manNumber.setAttribute(
+        "font-size",
+        this._boostMode === "Automatic"
+          ? ACTIVE_FONT_SIZE
+          : NON_ACTIVE_FONT_SIZE,
+      );
     }
   }
 

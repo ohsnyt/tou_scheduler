@@ -8,10 +8,10 @@ set_boost:
       selector:
         select:
           options:
-            - "standard"
-            - "manual"
-            - "testing"
-            - "off"
+            - "Automatic"
+            - "Manual"
+            - "Testing"
+            - "Off"
 
 set_manual_grid_boost:
   description: "Set the manual grid boost value"
@@ -69,10 +69,10 @@ set_boost_settings:
       selector:
         select:
           options:
-            - "standard"
-            - "manual"
-            - "testing"
-            - "off"
+            - "Automatic"
+            - "Manual"
+            - "Testing"
+            - "Off"
     str, manual_grid_boost:
       description: "Manual grid boost value"
       example: 50
@@ -96,7 +96,7 @@ set_boost_settings:
       selector:
         number:
           min: 1
-          max: 30
+          max: 10
     update_hour:
       description: "Solcast update hour"
       example: 23
