@@ -11,8 +11,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import CLOUD_UPDATE_INTERVAL, DEBUGGING, DOMAIN
 
-# from .tou_scheduler import TOUScheduler
-
 _LOGGER = logging.getLogger(__name__)
 if DEBUGGING:
     _LOGGER.setLevel(logging.DEBUG)
@@ -42,7 +40,7 @@ class TOUUpdateCoordinator(DataUpdateCoordinator):
         """Fetch all data for your sensors here."""
         if self.update_method:
             try:
-                return self.update_method()
+                return await self.update_method()
             except Exception as e:
                 _LOGGER.error("Failed to update sensors: %s", e)
                 raise UpdateFailed(f"Failed to update sensors: {e}") from e

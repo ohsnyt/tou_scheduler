@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 import logging
@@ -43,7 +44,6 @@ def string_to_int_list(string_list) -> list[int]:
     """Convert a string containing one or more integers into a list of ints."""
     return [int(i.strip()) for i in string_list.split(",") if i.strip().isdigit()]
 
-
 def printable_hour(hour: int) -> str:
     """Return a printable hour string in 12-hour format with 'am' or 'pm' suffix.
 
@@ -57,7 +57,6 @@ def printable_hour(hour: int) -> str:
         f"{(hour % 12) or 12}"
         f"{'am' if hour < 12 else 'pm'}"
     )
-
 
 class TOUScheduler:
     """Class to manage Time of Use (TOU) scheduling for Home Assistant.
@@ -119,6 +118,9 @@ class TOUScheduler:
         self.days_of_load_history: int = DEFAULT_GRID_BOOST_HISTORY
         self._update_tou_boost: bool = False
 
+        # Start the background tasks
+        self._setup_background_tasks()
+
     # Data loading and saving
     async def async_load_shading(self):
         """Load shading data from storage."""
@@ -141,6 +143,28 @@ class TOUScheduler:
         """Save forecast data to storage."""
         await self.store_forecast.async_save(self.solcast_api.forecast)
 
+    # Background tasks to update the sensors
+    def _setup_background_tasks(self):
+        """Set up background tasks for periodic updates."""
+        asyncio.create_task(self._run_five_minute_task())
+        asyncio.create_task(self._run_hourly_task())
+
+    async def _run_five_minute_task(self):
+        """Run the five-minute task."""
+        while True:
+            await self.inverter_api.refresh_data()
+            await asyncio.sleep(300)  # Sleep for 5 minutes (300 seconds)
+
+    async def _run_hourly_task(self):
+        """Run the hourly task."""
+        while True:
+            now = datetime.now()
+            next_hour = (now + timedelta(hours=1)).replace(minute=1, second=0, microsecond=0)
+            sleep_duration = (next_hour - now).total_seconds()
+            await asyncio.sleep(sleep_duration)
+            await self._hourly_updates()
+
+    # SERVICE CALLS start here
     async def async_update_boost_settings(self, boost_mode: str, manual_grid_boost: int, min_battery_soc: int, percentile: int, days_of_load_history: int, boost_hour: int) -> None:
         """Service call to allow tou-scheduler-card.js to return settings data."""
         self._boost = boost_mode
@@ -153,7 +177,6 @@ class TOUScheduler:
         # Call the coordinator and request async_request_refresh
         if self.coordinator:
             await self.coordinator.async_request_refresh()
-
 
     async def set_boost(self, boost: str) -> None:
         """Set the boost mode."""
@@ -199,6 +222,7 @@ class TOUScheduler:
             options={**self.config_entry.options, "history_days": days_of_load_history},
         )
         await self.update_sensors()
+    # SERVICE CALLS end here
 
     async def _request_ha_statistics(
         self, entity_ids: set[str], days: int
@@ -284,7 +308,7 @@ class TOUScheduler:
         )
         return defaultdict(list, stats)
 
-    # Methods to manage options changes by the user
+    # INTEGRATION WITH CONFIG_OPTIONS starts here
     async def _handle_options_dialog(
         self, hass: HomeAssistant, config_entry: ConfigEntry
     ) -> None:
@@ -321,6 +345,7 @@ class TOUScheduler:
     ) -> None:
         """Handle option updates callback."""
         await self._handle_options_dialog(hass, config_entry)
+    # INTEGRATION WITH CONFIG_OPTIONS ends here
 
     # Private calculation methods
     async def _calculate_shading(self) -> None:
@@ -665,7 +690,7 @@ class TOUScheduler:
         if self.coordinator:
             await self.coordinator.async_request_refresh()
 
-    def to_dict(self) -> dict[str, float | str | datetime]:
+    async def to_dict(self) -> dict[str, float | str | datetime]:
         """Return this sensor data as a dictionary.
 
         This method provides expected battery life statistics and the grid boost value for the upcoming day.
@@ -675,6 +700,11 @@ class TOUScheduler:
             dict[str, Any]: A dictionary containing the sensor data.
 
         """
+        await self.inverter_api.refresh_data()
+
+        # Do hourly updates
+        await self._hourly_updates()
+
         # Get the current hour
         hour = datetime.now(ZoneInfo(self.inverter_api.timezone)).hour
         exhausted = datetime.now(tz=ZoneInfo(self.inverter_api.timezone)) + timedelta(
